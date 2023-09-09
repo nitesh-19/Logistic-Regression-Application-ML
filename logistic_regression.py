@@ -3,6 +3,18 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 
+def apply_logistic_regression(W, X, B):
+    """
+    Runs logistic regression on given parameters.
+
+    :param W: Weights as a numpy array.
+    :param X: Features as a numpy array.
+    :param B: The offset term supplied as a float or an integer.
+    :return: The output of the Logistic Regressio Function between 1 and 0.
+    """
+    return 1 / (1 + np.exp(-(np.dot(W, X)) + B))
+
+
 class LogisticRegression:
     def __init__(self, data_path, feature_indexes, target_index, values_to_replace=None):
         """
