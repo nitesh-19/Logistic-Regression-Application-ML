@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from random import sample
 
 
 def apply_logistic_regression(W, X, B):
@@ -39,7 +40,7 @@ def plot_result(dataframe, X, Y, W, B):
 
 
 class LogisticRegression:
-    def __init__(self, data_path, feature_indexes, target_index, values_to_replace=None):
+    def __init__(self, data_path, feature_indexes, target_index, values_to_replace=None, create_test_set=False):
         """
 
         :param data_path:
@@ -47,6 +48,8 @@ class LogisticRegression:
         :param target_index:
         :param values_to_replace:
         """
+        self.test_set = None
+        self.make_test_set = create_test_set
         self.cost = None
         self.alpha = 0.1
         self.scale_factors = []
@@ -65,6 +68,17 @@ class LogisticRegression:
         self.build_training_dataframe()
         self.run_trainer()
 
+    def create_test_set(self, data, percent_of_data=20):
+        length_of_data = len(data)
+        list_of_random_index = sample(range(0, length_of_data), round(length_of_data * percent_of_data / 100))
+        test_set = pd.DataFrame(data=data, index=list_of_random_index)
+        data.drop(index=list_of_random_index, inplace=True)
+        test_set.to_csv("test_set.csv")
+        data.to_csv("training_set.csv")
+
+        self.test_set = test_set
+        return data
+
     def scale_data(self, unscale=False):
         if not unscale:
             for i in range(len(self.features_index_list)):
@@ -80,7 +94,7 @@ class LogisticRegression:
                     self.working_dataframe[self.feature_column_names_list[i]] * self.scale_factors[i]
 
             self.B = self.B * self.scale_factors[-1]
-            for index in range(0, len(self.feature_column_names_list) - 1):
+            for index in range(len(self.feature_column_names_list) - 1):
                 self.W[index] = self.W[index] * self.scale_factors[-1] / self.scale_factors[index]
 
     def build_training_dataframe(self):
@@ -110,6 +124,8 @@ class LogisticRegression:
             self.working_dataframe = pd.DataFrame(data=data[self.feature_column_names_list]).copy()
             self.working_dataframe[self.target_column_name] = data[self.target_column_name]
             self.working_dataframe.dropna(axis=0, inplace=True)
+            if self.make_test_set is True:
+                self.working_dataframe = self.create_test_set(self.working_dataframe)
             self.m = self.working_dataframe.shape[0]
             self.scale_data()
 
@@ -125,6 +141,20 @@ class LogisticRegression:
             for inner_key in self.values_to_replace[key]:
                 data[key].replace(inner_key, self.values_to_replace[key][inner_key], inplace=True)
         return data
+
+    def get_model_accuracy(self):
+        test_data = pd.read_csv("test_set.csv")
+        number_of_correct_predictions = 0
+        for i in range(test_data.shape[0]):
+            X_array = self.get_feature_array(index=i, dataframe=test_data)
+            y = apply_logistic_regression(self.W, X_array, self.B)
+            if y >= 0.5:
+                y = 1
+            else:
+                y = 0
+            if test_data[self.target_column_name][i] == y:
+                number_of_correct_predictions += 1
+        return round(number_of_correct_predictions / test_data.shape[0] * 100, 2)
 
     def cost_function(self):
         """
@@ -171,13 +201,17 @@ class LogisticRegression:
         self.B = self.B - reduction_term_B
         self.cost_function()
 
-    def get_feature_array(self, index):
+    def get_feature_array(self, index, dataframe=None):
         """
         Returns a Numpy array of all the features in a specific row of the dataframe.
+        :param dataframe:
         :param index: The index of the row to be extracted
         :return: Numpy array of the all the features in the row
         """
-        return np.array(self.working_dataframe.iloc[index][self.feature_column_names_list])
+        if dataframe is None:
+            return np.array(self.working_dataframe.iloc[index][self.feature_column_names_list])
+        else:
+            return np.array(dataframe.iloc[index][self.feature_column_names_list])
 
     def run_trainer(self):
         flag = True
@@ -203,8 +237,9 @@ class LogisticRegression:
             self.scale_data(unscale=True)
             plot_result(self.working_dataframe, iterations_history, cost_history, self.W, self.B)
             print(f"W: {self.W}, B: {self.B}, Cost: {self.cost}")
-
+            print(f"Accuracy of the model: {self.get_model_accuracy()}%")
         else:
             self.scale_data(unscale=True)
             plot_result(self.working_dataframe, iterations_history, cost_history, self.W, self.B)
             print(f"W: {self.W}, B: {self.B}, Cost: {self.cost}")
+            print(f"Accuracy of the model: {self.get_model_accuracy()}%")
