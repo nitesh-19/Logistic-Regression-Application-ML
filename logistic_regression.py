@@ -21,15 +21,15 @@ def implement_logistic_regression_model(W, X, B, i):
 
 
 def plot_result(dataframe, X, Y, W, B):
-    list_of_y = []
-    list_of_x = []
+    x_coordinates = []
+    y_coordinates = []
     for i in range(0, int(dataframe["hours"].max()) + 1):
-        list_of_x.append(i)
-        list_of_y.append(implement_logistic_regression_model(W, X, B, i))
+        x_coordinates.append(i)
+        y_coordinates.append(implement_logistic_regression_model(W, X, B, i))
 
     fig1 = plt.figure("figure 1")
     plt.title("data")
-    plt.plot(list_of_x, list_of_y, "o")
+    plt.plot(x_coordinates, y_coordinates, "o")
     plt.scatter(dataframe["hours"], dataframe["iq"], c=dataframe["result"], marker="x")
     fig2 = plt.figure("figure 2")
     plt.title("Cost")
@@ -58,7 +58,7 @@ class LogisticRegression:
         self.values_to_replace = values_to_replace
         self.m = None
         self.W = np.zeros(len(self.features_index_list))
-        self.W = np.array([0.84721055, 1.05935965])
+        # self.W = np.array([0.84721055, 1.05935965])
         # self.B = 0
         self.B = -6.713996364075926
         self.target_column_name = None
@@ -67,25 +67,26 @@ class LogisticRegression:
 
     def scale_data(self, unscale=False):
         if not unscale:
-            for i in range(0, len(self.features_index_list)):
-                self.scale_factors.append(self.working_dataframe[self.feature_column_names_list[i]].max())
-                self.working_dataframe[self.feature_column_names_list[i]] = self.working_dataframe[
-                                                                                self.feature_column_names_list[i]] / \
-                                                                            self.working_dataframe[
-                                                                                self.feature_column_names_list[i]].max()
+            for i in range(len(self.features_index_list)):
+                max_value = self.working_dataframe[self.feature_column_names_list[i]].max()
+                self.scale_factors.append(max_value)
+
+                self.working_dataframe[self.feature_column_names_list[i]] = \
+                    self.working_dataframe[self.feature_column_names_list[i]] / max_value
+
         elif unscale:
-            for i in range(0, len(self.feature_column_names_list)):
-                self.working_dataframe[self.feature_column_names_list[i]] = self.working_dataframe[
-                                                                                self.feature_column_names_list[i]] * \
-                                                                            self.scale_factors[i]
-            # self.b = self.b * self.scale_factors[-1]
+            for i in range(len(self.feature_column_names_list)):
+                self.working_dataframe[self.feature_column_names_list[i]] = \
+                    self.working_dataframe[self.feature_column_names_list[i]] * self.scale_factors[i]
+
+            self.B = self.B * self.scale_factors[-1]
             for index in range(0, len(self.feature_column_names_list) - 1):
                 self.W[index] = self.W[index] * self.scale_factors[-1] / self.scale_factors[index]
 
     def build_training_dataframe(self):
         """
         Builds a dataframe with only relevant features and target for the trainer to work on. Also drops all rows with
-        missing data
+        missing data and scales the data
         :return:
         """
         if self.DATA_PATH is None:
@@ -110,6 +111,7 @@ class LogisticRegression:
             self.working_dataframe[self.target_column_name] = data[self.target_column_name]
             self.working_dataframe.dropna(axis=0, inplace=True)
             self.m = self.working_dataframe.shape[0]
+            self.scale_data()
 
     def replace_strings_with_numbers(self, data):
         """
@@ -132,18 +134,12 @@ class LogisticRegression:
         """
         summation = 0
         for integer in range(self.m):
-            # change log10 to log
             y_i = self.working_dataframe.iloc[integer][self.target_column_name]
             X_array = self.get_feature_array(integer)
             if y_i == 0:
                 summation += np.log(1 - apply_logistic_regression(self.W, X_array, self.B))
             elif y_i == 1:
                 summation += np.log(apply_logistic_regression(self.W, X_array, self.B))
-
-                # summation += (self.working_dataframe.iloc[integer][self.target_column_name] * np.log10(
-                #     apply_logistic_regression(self.W, self.get_feature_array(integer), self.B))) + (
-                # (1 - self.working_dataframe.iloc[integer][self.target_column_name]) * np.log10(
-                #     1 - apply_logistic_regression(self.W, self.get_feature_array(integer), self.B)))
         self.cost = summation * (-1 / self.m)
 
         return self.cost
@@ -191,7 +187,6 @@ class LogisticRegression:
         iterations_history = []
         try:
             while flag:
-
                 self.gradient_descent()
                 print(f"W: {self.W}, B: {self.B}, Cost: {self.cost}")
                 iterations_finished += 1
@@ -205,6 +200,11 @@ class LogisticRegression:
                 prev_cost = self.cost
 
         except KeyboardInterrupt:
+            self.scale_data(unscale=True)
             plot_result(self.working_dataframe, iterations_history, cost_history, self.W, self.B)
+            print(f"W: {self.W}, B: {self.B}, Cost: {self.cost}")
+
         else:
+            self.scale_data(unscale=True)
             plot_result(self.working_dataframe, iterations_history, cost_history, self.W, self.B)
+            print(f"W: {self.W}, B: {self.B}, Cost: {self.cost}")
