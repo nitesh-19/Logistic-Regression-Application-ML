@@ -1,3 +1,5 @@
+import json
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -17,26 +19,28 @@ def apply_logistic_regression(W, X, B):
     return 1 / (1 + np.exp(-((np.dot(W, X)) + B)))
 
 
-def implement_logistic_regression_model(W, X, B, i):
-    return -((W[0] * X[i] + B) / W[1])
+def binomial_equation(W, X, B):
+    return -((W[0] * X + B) / W[1])
 
 
-def plot_result(dataframe, X, Y, W, B):
-    x_coordinates = []
-    y_coordinates = []
-    for i in range(0, int(dataframe["hours"].max()) + 1):
-        x_coordinates.append(i)
-        y_coordinates.append(implement_logistic_regression_model(W, X, B, i))
-
-    fig1 = plt.figure("figure 1")
-    plt.title("data")
-    plt.plot(x_coordinates, y_coordinates, "o")
-    plt.scatter(dataframe["hours"], dataframe["iq"], c=dataframe["result"], marker="x")
-    fig2 = plt.figure("figure 2")
-    plt.title("Cost")
-
-    plt.plot(X, Y, "o")
-    plt.show()
+def predict_from_saved_model(features, model_number=-1):
+    with open("models.json", "r") as input_file:
+        try:
+            data = json.load(input_file)
+        except json.JSONDecodeError:
+            print("No valid data found. Did you train the model first?")
+        else:
+            if model_number == -1:
+                chosen_model = data[list(data)[-1]]
+            else:
+                chosen_model = data[str(model_number)]
+            W = np.array(chosen_model["W"])
+            B = eval(chosen_model["B"])
+            scale_factors = eval(chosen_model["scale_factors"])
+            features = np.array(features)
+            features = np.divide(features, scale_factors)
+            result = apply_logistic_regression(W, features, B)
+            return result
 
 
 class LogisticRegression:
@@ -48,10 +52,11 @@ class LogisticRegression:
         :param target_index:
         :param values_to_replace:
         """
+        self.iterations_finished = None
         self.test_set = None
         self.make_test_set = create_test_set
         self.cost = None
-        self.alpha = 0.1
+        self.alpha = 0.5
         self.scale_factors = []
         self.feature_column_names_list = None
         self.working_dataframe = None
@@ -60,13 +65,32 @@ class LogisticRegression:
         self.target_index_list = target_index
         self.values_to_replace = values_to_replace
         self.m = None
-        self.W = np.zeros(len(self.features_index_list))
-        # self.W = np.array([0.84721055, 1.05935965])
+        # self.W = np.zeros(len(self.features_index_list))
+        self.W = np.array([7.06308726, 5.40859122])
         # self.B = 0
-        self.B = -6.713996364075926
+        self.B = -6.790020028258589
         self.target_column_name = None
         self.build_training_dataframe()
         self.run_trainer()
+
+    def plot_result(self, dataframe, X, Y, W, B):
+        x_coordinates = []
+        y_coordinates = []
+        for i in range(9):
+            x_coordinates.append(i)
+            y_coordinates.append(binomial_equation(W, i / self.scale_factors[0], B) * self.scale_factors[1])
+
+        self.scale_data(unscale=True)
+
+        fig1 = plt.figure("figure 1")
+        plt.title("data")
+        plt.plot(x_coordinates, y_coordinates, "o")
+        plt.scatter(dataframe["hours"], dataframe["iq"], c=dataframe["result"], marker="x")
+
+        fig2 = plt.figure("figure 2")
+        plt.title("Cost")
+        plt.plot(X, Y, "o")
+        plt.show()
 
     def create_test_set(self, data, percent_of_data=20):
         length_of_data = len(data)
@@ -93,9 +117,9 @@ class LogisticRegression:
                 self.working_dataframe[self.feature_column_names_list[i]] = \
                     self.working_dataframe[self.feature_column_names_list[i]] * self.scale_factors[i]
 
-            self.B = self.B * self.scale_factors[-1]
-            for index in range(len(self.feature_column_names_list) - 1):
-                self.W[index] = self.W[index] * self.scale_factors[-1] / self.scale_factors[index]
+            # self.B = self.B * self.scale_factors[-1]
+            # for index in range(len(self.feature_column_names_list) - 1):
+            #     self.W[index] = self.W[index] * self.scale_factors[-1] / self.scale_factors[index]
 
     def build_training_dataframe(self):
         """
@@ -144,9 +168,11 @@ class LogisticRegression:
 
     def get_model_accuracy(self):
         test_data = pd.read_csv("test_set.csv")
+        test_data.drop(test_data.columns[0], axis=1, inplace=True)
         number_of_correct_predictions = 0
         for i in range(test_data.shape[0]):
             X_array = self.get_feature_array(index=i, dataframe=test_data)
+            X_array = X_array / self.scale_factors
             y = apply_logistic_regression(self.W, X_array, self.B)
             if y >= 0.5:
                 y = 1
@@ -213,20 +239,40 @@ class LogisticRegression:
         else:
             return np.array(dataframe.iloc[index][self.feature_column_names_list])
 
+    def write_json(self):
+        with open("models.json", "r") as inpfile:
+            try:
+                data = json.load(inpfile)
+                list_data = [int(key) for key in list(data)]
+                params = {max(list_data) + 1: {"W": list(self.W),
+                                               "B": str(self.B),
+                                               "scale_factors": str(self.scale_factors),
+                                               "iterations_finished": self.iterations_finished
+
+                                               }}
+                data.update(params)
+            except json.JSONDecodeError:
+                with open("models.json", "w") as outfile:
+                    init_dictionary = {0: {"W": "init", "B": "init", }}
+                    json.dump(init_dictionary, outfile, indent=4)
+            else:
+                with open("models.json", "w") as outfile:
+                    json.dump(data, outfile, indent=4)
+
     def run_trainer(self):
         flag = True
         prev_cost = 0
-        iterations_finished = 0
+        self.iterations_finished = 0
         cost_history = []
         iterations_history = []
         try:
             while flag:
                 self.gradient_descent()
                 print(f"W: {self.W}, B: {self.B}, Cost: {self.cost}")
-                iterations_finished += 1
-                if iterations_finished % 1 == 0:
+                self.iterations_finished += 1
+                if self.iterations_finished % 1 == 0:
                     cost_history.append(self.cost)
-                    iterations_history.append(iterations_finished)
+                    iterations_history.append(self.iterations_finished)
 
                 if self.cost == prev_cost:
                     print(self.W, self.B, self.cost)
@@ -234,12 +280,10 @@ class LogisticRegression:
                 prev_cost = self.cost
 
         except KeyboardInterrupt:
-            self.scale_data(unscale=True)
-            plot_result(self.working_dataframe, iterations_history, cost_history, self.W, self.B)
-            print(f"W: {self.W}, B: {self.B}, Cost: {self.cost}")
+            self.plot_result(self.working_dataframe, iterations_history, cost_history, self.W, self.B)
             print(f"Accuracy of the model: {self.get_model_accuracy()}%")
+            self.write_json()
         else:
-            self.scale_data(unscale=True)
-            plot_result(self.working_dataframe, iterations_history, cost_history, self.W, self.B)
-            print(f"W: {self.W}, B: {self.B}, Cost: {self.cost}")
+            self.plot_result(self.working_dataframe, iterations_history, cost_history, self.W, self.B)
             print(f"Accuracy of the model: {self.get_model_accuracy()}%")
+            self.write_json()
