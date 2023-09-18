@@ -4,6 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from random import sample
 import math
+import time
 
 
 def apply_logistic_regression(W, X, B):
@@ -24,7 +25,7 @@ def binomial_equation(W, X, B):
 
 
 class LogisticRegression:
-    def __init__(self, data_path, feature_indexes, target_index, values_to_replace=None, create_test_set=False):
+    def __init__(self, data_path, feature_indexes, target_index, alpha, iterations_limit=10000, values_to_replace=None, create_test_set=False):
         """
 
         :param data_path:
@@ -34,25 +35,28 @@ class LogisticRegression:
         """
         self.degree = None
         self.iterations_finished = None
+        self.iterations_limit = iterations_limit
         self.test_set = None
-        self.make_test_set = create_test_set
+        self.should_make_test_set = create_test_set
         self.cost = None
-        self.alpha = 0.9
-        self.scale_factors = []
-        self.feature_column_names_list = None
+        self.alpha = alpha
+        self.scaling_factors = []
+        self.feature_names = None
         self.working_dataframe = None
         self.DATA_PATH = data_path
-        self.features_index_list = feature_indexes
-        self.target_index_list = target_index
+        self.feature_column_indexes = feature_indexes
+        self.target_index = target_index
         self.values_to_replace = values_to_replace
         self.m = None
-        self.W = np.zeros(len(self.features_index_list))
+        #########
+        self.W = np.zeros(len(self.feature_column_indexes))
         # self.W = np.array([7.06308726, 5.40859122])
         self.B = 0
         # self.B = -6.790020028258589
-        self.target_column_name = None
+        #######
+        self.target_name = None
         self.build_training_dataframe()
-        # self.run_trainer()
+        self.run_trainer()
         print(self.predict_from_saved_model(features=[7, 120], model_number=18))
         self.plot_curve()
 
@@ -61,9 +65,9 @@ class LogisticRegression:
         y_coordinates = []
         z_coordinates = []
         for i in range(90):
-            i = i/10
+            i = i / 10
             for j in range(50):
-                j=j*2
+                j = j * 2
                 x_coordinates.append(i)
                 y_coordinates.append(j)
                 z_coordinate = self.predict_from_saved_model([i, j], model_number=18)  # * self.scale_factors[1])
@@ -77,7 +81,7 @@ class LogisticRegression:
         # plt.scatter(dataframe["hours"], dataframe["iq"], c=dataframe["result"], marker="x")
         plt.show()
 
-    def plot_result(self, dataframe, X, Y, W, B):
+    def plot_2d_result(self, dataframe, X, Y):
         x_coordinates = []
         y_coordinates = []
         z_coordinates = []
@@ -85,7 +89,7 @@ class LogisticRegression:
             for j in range(100):
                 x_coordinates.append(i)
                 y_coordinates.append(j)
-                z_coordinate = self.predict_from_saved_model([i, j], model_number=18)  # * self.scale_factors[1])
+                z_coordinate = self.predict_from_saved_model([i, j], model_number=18)
                 if z_coordinate >= 0.5:
                     z_coordinates.append(15)
                 else:
@@ -122,10 +126,17 @@ class LogisticRegression:
                 return result
 
     def create_test_set(self, data, percent_of_data=20):
-        length_of_data = len(data)
-        list_of_random_index = sample(range(0, length_of_data), round(length_of_data * percent_of_data / 100))
-        test_set = pd.DataFrame(data=data, index=list_of_random_index)
-        data.drop(index=list_of_random_index, inplace=True)
+        """
+        Create a testing dataset from the dataframe supplied at random.
+        :param data: Pandas Dataframe
+        :param percent_of_data: Integer. Percentage of data to keep aside for testing.
+        :return: Pandas Dataframe.
+        """
+
+        rows_of_data = data.shape[0]
+        random_indexes = sample(range(rows_of_data), round(rows_of_data * percent_of_data / 100))
+        test_set = pd.DataFrame(data=data, index=random_indexes)
+        data.drop(index=random_indexes, inplace=True)
         test_set.to_csv("test_set.csv")
         data.to_csv("training_set.csv")
 
@@ -133,25 +144,41 @@ class LogisticRegression:
         return data
 
     def map_dataframe(self, degree=6):
+        """
+        Increases the training dataframe size by extrapolating higher degree features from already existing features to
+        better fit the data.
+
+        :param degree: Integer. The degree of the polynomial function that will fit the data.
+        :return: None
+        """
         self.degree = degree
-        mapped_dataframe = pd.DataFrame(columns=self.feature_column_names_list)
+        # Temporary dataframe to organize data.
+        mapped_dataframe = pd.DataFrame(columns=self.feature_names)
+
+        # Create empty columns for original and mapped features.
         mapped_dataframe[
-            [i for i in range(len(self.feature_column_names_list),
-                              len(self.feature_column_names_list) * degree + math.comb(degree, 2))]] = np.nan
-        print(mapped_dataframe)
-        for k in range(self.m):
-            features = []
-            features_list = self.get_feature_array(k)
+            [i for i in range(len(self.feature_names),
+                              len(self.feature_names) * degree + math.comb(degree, 2))]] = np.nan
+
+        # Create and add mapped features
+        for row_index in range(self.m):
+            added_features = []
+            features = self.get_features_from_row(row_index)
+            ##            #####
             for i in range(1, degree + 1):
                 for j in range(i + 1):
-                    features.append((features_list[0] ** (i - j) * (features_list[1] ** j)))
-            print(features)
-            mapped_dataframe.loc[k] = features
-        mapped_dataframe[self.target_column_name] = self.working_dataframe[self.target_column_name]
+                    added_features.append((features[0] ** (i - j) * (features[1] ** j)))
+            ##            #####
+            mapped_dataframe.loc[row_index] = added_features
+
+        mapped_dataframe[self.target_name] = self.working_dataframe[self.target_name]
+
+        # Replace the original dataframe with mapped dataframe
         self.working_dataframe = mapped_dataframe
-        self.feature_column_names_list = self.working_dataframe.columns[:-1]
+        self.feature_names = self.working_dataframe.columns[:-1]
+
+        # Increase the number of weights to accomodate additional features
         self.W = np.zeros(mapped_dataframe.shape[1] - 1)
-        print(mapped_dataframe)
 
     def map_features(self, features_list):
         features = []
@@ -161,53 +188,63 @@ class LogisticRegression:
         return np.array(features)
 
     def scale_data(self, unscale=False):
+        """
+        Scales the current dataframe by dividing each column with the maximum value in that column.
+
+        :param unscale: Boolean. If true, the function scales the data back to original.
+        :return: None
+        """
         if not unscale:
-            for i in range(len(self.feature_column_names_list)):
-                max_value = self.working_dataframe[self.feature_column_names_list[i]].max()
-                self.scale_factors.append(max_value)
+            for i in range(len(self.feature_names)):
+                max_value = self.working_dataframe[self.feature_names[i]].max()
+                self.scaling_factors.append(max_value)
 
-                self.working_dataframe[self.feature_column_names_list[i]] = \
-                    self.working_dataframe[self.feature_column_names_list[i]] / max_value
-
+                self.working_dataframe[self.feature_names[i]] = \
+                    self.working_dataframe[self.feature_names[i]] / max_value
+        ############
         elif unscale:
-
             for i in range(2):
-                self.working_dataframe[self.feature_column_names_list[i]] = \
-                    self.working_dataframe[self.feature_column_names_list[i]] * self.scale_factors[i]
+                self.working_dataframe[self.feature_names[i]] = \
+                    self.working_dataframe[self.feature_names[i]] * self.scaling_factors[i]
 
-            # self.B = self.B * self.scale_factors[-1]
-            # for index in range(len(self.feature_column_names_list) - 1):
-            #     self.W[index] = self.W[index] * self.scale_factors[-1] / self.scale_factors[index]
+    #############
 
     def build_training_dataframe(self):
         """
-        Builds a dataframe with only relevant features and target for the trainer to work on. Also drops all rows with
-        missing data and scales the data
-        :return:
+        Builds a training dataframe to run the algorithm on.
+        Fetches data from csv file, adds higher degree features, deletes rows with missing data and also scales the data.
+        :return: None
         """
+
         if self.DATA_PATH is None:
             raise TypeError(
                 f"LinearRegression.DATA_PATH empty. Try setting LinearRegression.DATA_PATH to a string before starting "
                 f"the training.")
-        if self.features_index_list is None:
+        if self.feature_column_indexes is None:
             raise TypeError(
                 f"LinearRegression.x_index_list empty. Try setting LinearRegression.x_index_list to a list before "
                 f"starting the training.")
-        if self.target_index_list is None:
+        if self.target_index is None:
             raise TypeError(
                 f"LinearRegression.y empty. Try setting LinearRegression.y to a list before starting the "
                 f"training.")
         else:
             data = pd.read_csv(self.DATA_PATH)
+
+            # Replace the alphabetical data with the numerical data.
             if self.values_to_replace is not None:
                 data = self.replace_strings_with_numbers(data=data)
-            self.feature_column_names_list = [data.columns[index] for index in self.features_index_list]
-            self.target_column_name = data.columns[self.target_index_list]
-            self.working_dataframe = pd.DataFrame(data=data[self.feature_column_names_list]).copy()
-            self.working_dataframe[self.target_column_name] = data[self.target_column_name]
+
+            # Create Dataframe
+            self.feature_names = [data.columns[index] for index in self.feature_column_indexes]
+            self.target_name = data.columns[self.target_index]
+            self.working_dataframe = pd.DataFrame(data=data[self.feature_names]).copy()
+            self.working_dataframe[self.target_name] = data[self.target_name]
             self.working_dataframe.dropna(axis=0, inplace=True)
-            if self.make_test_set is True:
-                self.working_dataframe = self.create_test_set(self.working_dataframe)
+
+            # Separate testing data from the dataframe.
+            if self.should_make_test_set is True:
+                self.working_dataframe = self.create_test_set(self.working_dataframe, percent_of_data=20)
             self.m = self.working_dataframe.shape[0]
             self.scale_data()
             self.map_dataframe(degree=6)
@@ -217,8 +254,8 @@ class LogisticRegression:
         Replaces the string values in dataframe with corresponding numerical values as supplied in the
         "values_to_replace" argument.
 
-        :param data: Dataframe to replace the values in
-        :return: Dataframe after replacing the values
+        :param data: Pandas Dataframe to replace the values in.
+        :return: The Dataframe after replacing the values.
         """
         for key in self.values_to_replace:
             for inner_key in self.values_to_replace[key]:
@@ -230,13 +267,13 @@ class LogisticRegression:
         test_data.drop(test_data.columns[0], axis=1, inplace=True)
         number_of_correct_predictions = 0
         for i in range(test_data.shape[0]):
-            X_array = self.map_features(self.get_feature_array(index=i, dataframe=test_data) / self.scale_factors)
+            X_array = self.map_features(self.get_features_from_row(index=i, dataframe=test_data) / self.scaling_factors)
             y = apply_logistic_regression(self.W, X_array, self.B)
             if y >= 0.5:
                 y = 1
             else:
                 y = 0
-            if test_data[self.target_column_name][i] == y:
+            if test_data[self.target_name][i] == y:
                 number_of_correct_predictions += 1
         return round(number_of_correct_predictions / test_data.shape[0] * 100, 2)
 
@@ -244,48 +281,56 @@ class LogisticRegression:
         """
         Calculates and returns overall cost of the model with the current parameters.
 
-        :return:
+        :return: (Float) Cost of the model
         """
+        start = time.time()
         summation = 0
         for integer in range(self.m):
-            y_i = self.working_dataframe.iloc[integer][self.target_column_name]
-            X_array = self.get_feature_array(integer)
+            y_i = self.working_dataframe.iloc[integer][self.target_name]
+            X_array = self.get_features_from_row(integer)
             if y_i == 0:
                 summation += np.log(1 - apply_logistic_regression(self.W, X_array, self.B))
             elif y_i == 1:
                 summation += np.log(apply_logistic_regression(self.W, X_array, self.B))
         self.cost = summation * (-1 / self.m)
-
+        end = time.time()
+        print("The time of execution for cost_function :",
+              (end - start) * 10 ** 3, "ms")
         return self.cost
 
     def gradient_descent(self):
         """
         Runs Gradient descent on the model and updates the weights.
-        :return:
+        :return: None
         """
+
+        start = time.time()
         sum_of_B = 0
-        sum_of_W = np.zeros(len(self.feature_column_names_list))
-        for j in range(len(self.feature_column_names_list)):
+        sum_of_W = np.zeros(len(self.feature_names))
+        for j in range(len(self.feature_names)):
             for i in range(self.m):
-                X_array = self.get_feature_array(i)
+                X_array = self.get_features_from_row(i)
                 sum_of_W[j] += (apply_logistic_regression(self.W, X_array, self.B) -
-                                self.working_dataframe.iloc[i][self.target_column_name]) * X_array[j]
+                                self.working_dataframe.iloc[i][self.target_name]) * X_array[j]
         sum_of_W /= self.m
         sum_of_W *= self.alpha
 
         for k in range(0, self.m):
-            X_array = self.get_feature_array(k)
-
+            X_array = self.get_features_from_row(k)
             sum_of_B += apply_logistic_regression(self.W, X_array, self.B) - self.working_dataframe.iloc[k][
-                self.target_column_name]
+                self.target_name]
 
+        # Update Parameters
         self.W = self.W - sum_of_W
         sum_of_B /= self.m
         reduction_term_B = sum_of_B * self.alpha
         self.B = self.B - reduction_term_B
+        end = time.time()
+        print("The time of execution for gradient_descent :",
+              (end - start) * 10 ** 3, "ms")
         self.cost_function()
 
-    def get_feature_array(self, index, dataframe=None):
+    def get_features_from_row(self, index, dataframe=None):
         """
         Returns a Numpy array of all the features in a specific row of the dataframe.
         :param dataframe:
@@ -293,7 +338,7 @@ class LogisticRegression:
         :return: Numpy array of the all the features in the row
         """
         if dataframe is None:
-            return np.array(self.working_dataframe.iloc[index][self.feature_column_names_list])
+            return np.array(self.working_dataframe.iloc[index][self.feature_names])
         else:
             width = dataframe.shape[1] - 1
             return np.array(dataframe.iloc[index][[i for i in range(width)]])
@@ -305,7 +350,7 @@ class LogisticRegression:
                 list_data = [int(key) for key in list(data)]
                 params = {max(list_data) + 1: {"W": list(self.W),
                                                "B": str(self.B),
-                                               "scale_factors": str(self.scale_factors),
+                                               "scale_factors": str(self.scaling_factors),
                                                "iterations_finished": self.iterations_finished
                                                }}
                 data.update(params)
@@ -318,30 +363,32 @@ class LogisticRegression:
                     json.dump(data, outfile, indent=4)
 
     def run_trainer(self):
-        flag = True
-        prev_cost = 0
+        should_continue = True
+        prev_iteration_cost = 0
         self.iterations_finished = 0
         cost_history = []
         iterations_history = []
         try:
-            while flag:
+            while should_continue and self.iterations_finished <= self.iterations_limit:
                 self.gradient_descent()
                 print(f"W: {self.W}, B: {self.B}, Cost: {self.cost}")
                 self.iterations_finished += 1
+
+                # Sampling to plot cost function graph
                 if self.iterations_finished % 1 == 0:
                     cost_history.append(self.cost)
                     iterations_history.append(self.iterations_finished)
 
-                if self.cost == prev_cost:
+                if self.cost == prev_iteration_cost:
                     print(self.W, self.B, self.cost)
-                    flag = False
-                prev_cost = self.cost
+                    should_continue = False
+                prev_iteration_cost = self.cost
 
         except KeyboardInterrupt:
-            self.plot_result(self.working_dataframe, iterations_history, cost_history, self.W, self.B)
+            self.plot_2d_result(self.working_dataframe, iterations_history, cost_history)
             print(f"Accuracy of the model: {self.get_model_accuracy()}%")
             self.write_json()
         else:
-            self.plot_result(self.working_dataframe, iterations_history, cost_history, self.W, self.B)
+            self.plot_2d_result(self.working_dataframe, iterations_history, cost_history)
             print(f"Accuracy of the model: {self.get_model_accuracy()}%")
             self.write_json()
