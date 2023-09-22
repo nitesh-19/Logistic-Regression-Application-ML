@@ -16,8 +16,9 @@ def apply_logistic_regression(W, X, B):
     :param B: The offset term supplied as a float or an integer.
     :return: The output of the Logistic Regressio Function between 1 and 0.
     """
-
-    return 1 / (1 + np.exp(-((np.dot(W, X)) + B)))
+    frame = W * X
+    addition_column = np.sum(frame, axis=1)
+    return 1 / (1 + np.exp(-(addition_column + B)))
 
 
 def binomial_equation(W, X, B):
@@ -34,6 +35,7 @@ class LogisticRegression:
         :param target_index:
         :param values_to_replace:
         """
+        self.range_of_rows = None
         self.degree = None
         self.iterations_finished = None
         self.iterations_limit = iterations_limit
@@ -309,20 +311,17 @@ class LogisticRegression:
         """
 
         start = time.time()
-        sum_of_B = 0
-        sum_of_W = np.zeros(len(self.feature_names))
-
-        for i in range(self.m):
-            X_array = self.get_features_from_row(i)
-            sum_of_W += (apply_logistic_regression(self.W, X_array, self.B) -
-                         self.working_dataframe.iloc[i][self.target_name]) * X_array
+        sum_of_W = np.zeros((self.range_of_rows[-1], len(self.feature_names)))
+        X_array = self.working_dataframe[self.feature_names].to_numpy()
+        w_frame = np.tile(self.W, (self.range_of_rows[-1], 1))
+        term1 = np.array(apply_logistic_regression(w_frame, X_array, self.B) -
+                         self.working_dataframe[self.target_name])
+        sum_of_W += term1[:, np.newaxis] * X_array
+        sum_of_W = np.sum(sum_of_W, axis=0)
         sum_of_W /= self.m
         sum_of_W *= self.alpha
 
-        for k in range(self.m):
-            X_array = self.get_features_from_row(k)
-            sum_of_B += apply_logistic_regression(self.W, X_array, self.B) - self.working_dataframe.iloc[k][
-                self.target_name]
+        sum_of_B = np.sum(term1)
 
         # Update Parameters
         self.W = self.W - sum_of_W
@@ -367,6 +366,7 @@ class LogisticRegression:
                     json.dump(data, outfile, indent=4)
 
     def run_trainer(self):
+        self.range_of_rows = range(self.m + 1)
         should_continue = True
         prev_iteration_cost = 0
         self.iterations_finished = 0
