@@ -25,7 +25,8 @@ def binomial_equation(W, X, B):
 
 
 class LogisticRegression:
-    def __init__(self, data_path, feature_indexes, target_index, alpha, iterations_limit=10000, values_to_replace=None, create_test_set=False):
+    def __init__(self, data_path, feature_indexes, target_index, alpha, iterations_limit=10000, values_to_replace=None,
+                 create_test_set=False):
         """
 
         :param data_path:
@@ -57,8 +58,8 @@ class LogisticRegression:
         self.target_name = None
         self.build_training_dataframe()
         self.run_trainer()
-        print(self.predict_from_saved_model(features=[7, 120], model_number=18))
-        self.plot_curve()
+        # print(self.predict_from_saved_model(feature_values=[7, 120]))
+        # self.plot_curve()
 
     def plot_curve(self):
         x_coordinates = []
@@ -70,7 +71,7 @@ class LogisticRegression:
                 j = j * 2
                 x_coordinates.append(i)
                 y_coordinates.append(j)
-                z_coordinate = self.predict_from_saved_model([i, j], model_number=18)  # * self.scale_factors[1])
+                z_coordinate = self.predict_from_saved_model([i, j])  # * self.scale_factors[1])
                 if z_coordinate >= 0.5:
                     z_coordinates.append(2)
                 else:
@@ -81,32 +82,34 @@ class LogisticRegression:
         # plt.scatter(dataframe["hours"], dataframe["iq"], c=dataframe["result"], marker="x")
         plt.show()
 
-    def plot_2d_result(self, dataframe, X, Y):
-        x_coordinates = []
-        y_coordinates = []
-        z_coordinates = []
-        for i in range(9):
-            for j in range(100):
-                x_coordinates.append(i)
-                y_coordinates.append(j)
-                z_coordinate = self.predict_from_saved_model([i, j], model_number=18)
-                if z_coordinate >= 0.5:
-                    z_coordinates.append(15)
-                else:
-                    z_coordinates.append(0)
+    def plot_2d_result(self, columns):
         self.scale_data(unscale=True)
+        column_1 = np.linspace(self.working_dataframe[columns[0]].min(), self.working_dataframe[columns[0]].max(), 100)
+        column_2 = np.linspace(self.working_dataframe[columns[1]].min(), self.working_dataframe[columns[1]].max(), 100)
+        z_coordinates = np.zeros((len(column_2), len(column_1)))
+        for j in range(len(column_2)):
+            temp_z = np.zeros(len(column_1))
+            for i in range(len(column_1)):
+                z = self.predict_from_saved_model([column_1[i], column_2[j]])
+                if z >= 0.5:
+                    temp_z[i] = 1
+                elif z < 0.5:
+                    temp_z[i] = 0
+                # temp_z[i] = z
+            z_coordinates[j] = temp_z
 
         fig1 = plt.figure("figure 1")
-        plt.title("data")
-        plt.scatter(x_coordinates, y_coordinates, s=z_coordinates)
-        plt.scatter(dataframe["hours"], dataframe["iq"], c=dataframe["result"], marker="x")
+        plt.title("Decision Boundary")
+        plt.contourf(column_1, column_2, z_coordinates)
+        plt.scatter(self.working_dataframe[columns[0]], self.working_dataframe[columns[1]],
+                    c=self.working_dataframe[columns[2]], marker="x")
 
-        fig2 = plt.figure("figure 2")
-        plt.title("Cost")
-        plt.plot(X, Y, "o")
+        # fig2 = plt.figure("figure 2")
+        # plt.title("Cost")
+        # plt.plot(X, Y, "o")
         plt.show()
 
-    def predict_from_saved_model(self, features, model_number=-1):
+    def predict_from_saved_model(self, feature_values, model_number=-1):
         with open("models.json", "r") as input_file:
             try:
                 data = json.load(input_file)
@@ -120,9 +123,9 @@ class LogisticRegression:
                 W = np.array(chosen_model["W"])
                 B = eval(chosen_model["B"])
                 scale_factors = eval(chosen_model["scale_factors"])
-                features = np.array(features)
-                features = np.divide(features, scale_factors)
-                result = apply_logistic_regression(W, self.map_features(features), B)
+                feature_values = np.array(feature_values)
+                feature_values = np.divide(feature_values, scale_factors)
+                result = apply_logistic_regression(W, self.map_features(feature_values), B)
                 return result
 
     def create_test_set(self, data, percent_of_data=20):
@@ -267,7 +270,8 @@ class LogisticRegression:
         test_data.drop(test_data.columns[0], axis=1, inplace=True)
         number_of_correct_predictions = 0
         for i in range(test_data.shape[0]):
-            X_array = self.map_features(self.get_features_from_row(index=i, dataframe=test_data) / self.scaling_factors)
+            X_array = self.map_features(
+                self.get_features_from_row(index=i, dataframe=test_data) / self.scaling_factors)
             y = apply_logistic_regression(self.W, X_array, self.B)
             if y >= 0.5:
                 y = 1
@@ -307,11 +311,11 @@ class LogisticRegression:
         start = time.time()
         sum_of_B = 0
         sum_of_W = np.zeros(len(self.feature_names))
-        for j in range(len(self.feature_names)):
-            for i in range(self.m):
-                X_array = self.get_features_from_row(i)
-                sum_of_W[j] += (apply_logistic_regression(self.W, X_array, self.B) -
-                                self.working_dataframe.iloc[i][self.target_name]) * X_array[j]
+
+        for i in range(self.m):
+            X_array = self.get_features_from_row(i)
+            sum_of_W += (apply_logistic_regression(self.W, X_array, self.B) -
+                         self.working_dataframe.iloc[i][self.target_name]) * X_array
         sum_of_W /= self.m
         sum_of_W *= self.alpha
 
@@ -385,10 +389,10 @@ class LogisticRegression:
                 prev_iteration_cost = self.cost
 
         except KeyboardInterrupt:
-            self.plot_2d_result(self.working_dataframe, iterations_history, cost_history)
-            print(f"Accuracy of the model: {self.get_model_accuracy()}%")
             self.write_json()
+            self.plot_2d_result(columns=["hours", "iq", "result"])
+            print(f"Accuracy of the model: {self.get_model_accuracy()}%")
         else:
-            self.plot_2d_result(self.working_dataframe, iterations_history, cost_history)
-            print(f"Accuracy of the model: {self.get_model_accuracy()}%")
             self.write_json()
+            self.plot_2d_result(columns=["hours", "iq", "result"])
+            print(f"Accuracy of the model: {self.get_model_accuracy()}%")
