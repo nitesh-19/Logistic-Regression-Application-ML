@@ -84,8 +84,8 @@ class LogisticRegression:
 
     def plot_2d_result(self, columns):
         self.scale_data(unscale=True)
-        column_1 = np.linspace(self.working_dataframe[columns[0]].min(), self.working_dataframe[columns[0]].max(), 100)
-        column_2 = np.linspace(self.working_dataframe[columns[1]].min(), self.working_dataframe[columns[1]].max(), 100)
+        column_1 = np.linspace(self.working_dataframe[columns[0]].min(), self.working_dataframe[columns[0]].max(), 15)
+        column_2 = np.linspace(self.working_dataframe[columns[1]].min(), self.working_dataframe[columns[1]].max(), 15)
         z_coordinates = np.zeros((len(column_2), len(column_1)))
         for j in range(len(column_2)):
             temp_z = np.zeros(len(column_1))
@@ -319,7 +319,7 @@ class LogisticRegression:
         sum_of_W /= self.m
         sum_of_W *= self.alpha
 
-        for k in range(0, self.m):
+        for k in range(self.m):
             X_array = self.get_features_from_row(k)
             sum_of_B += apply_logistic_regression(self.W, X_array, self.B) - self.working_dataframe.iloc[k][
                 self.target_name]
