@@ -96,11 +96,11 @@ class LogisticRegression:
             temp_z = np.zeros(len(column_1))
             for i in range(len(column_1)):
                 z = self.predict_from_saved_model([column_1[i], column_2[j]])
-                if z >= 0.5:
-                    temp_z[i] = 1
-                elif z < 0.5:
-                    temp_z[i] = 0
-                # temp_z[i] = z
+                # if z >= 0.5:
+                #     temp_z[i] = 1
+                # elif z < 0.5:
+                #     temp_z[i] = 0
+                temp_z[i] = z
             z_coordinates[j] = temp_z
 
         fig1 = plt.figure("figure 1")
@@ -175,7 +175,7 @@ class LogisticRegression:
             ##            #####
             for i in range(1, degree + 1):
                 for j in range(i + 1):
-                    added_features.append((features[0] ** (i - j) * (features[1] ** j)))
+                    added_features.append((features[0] **  (i - j) * (features[1] ** j)))
             ##            #####
             mapped_dataframe.loc[row_index] = added_features
 
@@ -185,7 +185,7 @@ class LogisticRegression:
         self.working_dataframe = mapped_dataframe
         self.feature_names = self.working_dataframe.columns[:-1]
 
-        # Increase the number of weights to accomodate additional features
+        # Increase the number of weights to accommodate additional features
         self.W = np.zeros(mapped_dataframe.shape[1] - 1)
 
     def map_features(self, features_list):
@@ -292,20 +292,18 @@ class LogisticRegression:
 
         :return: (Float) Cost of the model
         """
-        start = time.time()
-        summation = 0
-
+        # start = time.time()
         X_array = self.working_dataframe[self.feature_names].to_numpy()
         y_i = self.working_dataframe[self.target_name]
 
         sum_of_dataframe = (y_i * np.log(apply_logistic_regression(self.W, X_array, self.B))) + (
-                    (1 - y_i) * np.log(1 - apply_logistic_regression(self.W, X_array, self.B)))
+                (1 - y_i) * np.log(1 - apply_logistic_regression(self.W, X_array, self.B)))
         sum_of_dataframe = np.sum(sum_of_dataframe)
 
         self.cost = sum_of_dataframe * (-1 / self.m)
-        end = time.time()
-        print("The time of execution for cost_function :",
-              (end - start) * 10 ** 3, "ms")
+        # end = time.time()
+        # print("The time of execution for cost_function :",
+        #       (end - start) * 10 ** 3, "ms")
         return self.cost
 
     def gradient_descent(self):
@@ -314,7 +312,7 @@ class LogisticRegression:
         :return: None
         """
 
-        start = time.time()
+        # start = time.time()
         sum_of_W = np.zeros((self.range_of_rows[-1], len(self.feature_names)))
         X_array = self.working_dataframe[self.feature_names].to_numpy()
         w_frame = np.tile(self.W, (self.range_of_rows[-1], 1))
@@ -332,9 +330,9 @@ class LogisticRegression:
         sum_of_B /= self.m
         reduction_term_B = sum_of_B * self.alpha
         self.B = self.B - reduction_term_B
-        end = time.time()
-        print("The time of execution for gradient_descent :",
-              (end - start) * 10 ** 3, "ms")
+        # end = time.time()
+        # print("The time of execution for gradient_descent :",
+        #       (end - start) * 10 ** 3, "ms")
         self.cost_function()
 
     def get_features_from_row(self, index, dataframe=None):
@@ -379,11 +377,12 @@ class LogisticRegression:
         try:
             while should_continue and self.iterations_finished <= self.iterations_limit:
                 self.gradient_descent()
-                print(f"W: {self.W}, B: {self.B}, Cost: {self.cost}")
+                if self.iterations_finished % 50 == 0:
+                    print(f"W: {self.W}, B: {self.B}, Cost: {self.cost}")
                 self.iterations_finished += 1
 
                 # Sampling to plot cost function graph
-                if self.iterations_finished % 1 == 0:
+                if self.iterations_finished % 100 == 0:
                     cost_history.append(self.cost)
                     iterations_history.append(self.iterations_finished)
 
