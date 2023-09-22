@@ -17,7 +17,10 @@ def apply_logistic_regression(W, X, B):
     :return: The output of the Logistic Regressio Function between 1 and 0.
     """
     frame = W * X
-    addition_column = np.sum(frame, axis=1)
+    if len(frame.shape) == 1:
+        addition_column = np.sum(frame)
+    else:
+        addition_column = np.sum(frame, axis=1)
     return 1 / (1 + np.exp(-(addition_column + B)))
 
 
@@ -291,6 +294,8 @@ class LogisticRegression:
         """
         start = time.time()
         summation = 0
+
+
         for integer in range(self.m):
             y_i = self.working_dataframe.iloc[integer][self.target_name]
             X_array = self.get_features_from_row(integer)
