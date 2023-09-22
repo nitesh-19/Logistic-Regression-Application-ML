@@ -295,15 +295,14 @@ class LogisticRegression:
         start = time.time()
         summation = 0
 
+        X_array = self.working_dataframe[self.feature_names].to_numpy()
+        y_i = self.working_dataframe[self.target_name]
 
-        for integer in range(self.m):
-            y_i = self.working_dataframe.iloc[integer][self.target_name]
-            X_array = self.get_features_from_row(integer)
-            if y_i == 0:
-                summation += np.log(1 - apply_logistic_regression(self.W, X_array, self.B))
-            elif y_i == 1:
-                summation += np.log(apply_logistic_regression(self.W, X_array, self.B))
-        self.cost = summation * (-1 / self.m)
+        sum_of_dataframe = (y_i * np.log(apply_logistic_regression(self.W, X_array, self.B))) + (
+                    (1 - y_i) * np.log(1 - apply_logistic_regression(self.W, X_array, self.B)))
+        sum_of_dataframe = np.sum(sum_of_dataframe)
+
+        self.cost = sum_of_dataframe * (-1 / self.m)
         end = time.time()
         print("The time of execution for cost_function :",
               (end - start) * 10 ** 3, "ms")
