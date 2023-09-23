@@ -400,7 +400,7 @@ class LogisticRegression:
 
         except KeyboardInterrupt:
             self.write_json()
-            print("Training Finished!")
+            print("Training Interrupted by KeyboardInterrupt!")
             print(f"Total number of iterations finished: {self.iterations_finished}")
             print(f"Accuracy of the model: {self.get_model_accuracy()}%")
         else:
