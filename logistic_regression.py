@@ -24,8 +24,8 @@ def apply_logistic_regression(W, X, B):
     return 1 / (1 + np.exp(-(addition_column + B)))
 
 
-def binomial_equation(W, X, B):
-    return -((W[0] * X + B) / W[1])
+# def binomial_equation(W, X, B):
+#     return -((W[0] * X + B) / W[1])
 
 
 class LogisticRegression:
@@ -66,26 +66,26 @@ class LogisticRegression:
         # print(self.predict_from_saved_model(feature_values=[7, 120]))
         # self.plot_curve()
 
-    def plot_curve(self):
-        x_coordinates = []
-        y_coordinates = []
-        z_coordinates = []
-        for i in range(90):
-            i = i / 10
-            for j in range(50):
-                j = j * 2
-                x_coordinates.append(i)
-                y_coordinates.append(j)
-                z_coordinate = self.predict_from_saved_model([i, j])  # * self.scale_factors[1])
-                if z_coordinate >= 0.5:
-                    z_coordinates.append(2)
-                else:
-                    z_coordinates.append(0)
-        fig1 = plt.figure("figure 1")
-        plt.title("data")
-        plt.scatter(x_coordinates, y_coordinates, s=z_coordinates)
-        # plt.scatter(dataframe["hours"], dataframe["iq"], c=dataframe["result"], marker="x")
-        plt.show()
+    # def plot_curve(self):
+    #     x_coordinates = []
+    #     y_coordinates = []
+    #     z_coordinates = []
+    #     for i in range(90):
+    #         i = i / 10
+    #         for j in range(50):
+    #             j = j * 2
+    #             x_coordinates.append(i)
+    #             y_coordinates.append(j)
+    #             z_coordinate = self.predict_from_saved_model([i, j])  # * self.scale_factors[1])
+    #             if z_coordinate >= 0.5:
+    #                 z_coordinates.append(2)
+    #             else:
+    #                 z_coordinates.append(0)
+    #     fig1 = plt.figure("figure 1")
+    #     plt.title("data")
+    #     plt.scatter(x_coordinates, y_coordinates, s=z_coordinates)
+    #     # plt.scatter(dataframe["hours"], dataframe["iq"], c=dataframe["result"], marker="x")
+    #     plt.show()
 
     def plot_2d_result(self, columns):
         self.scale_data(unscale=True)
@@ -393,9 +393,9 @@ class LogisticRegression:
 
         except KeyboardInterrupt:
             self.write_json()
-            self.plot_2d_result(columns=["hours", "iq", "result"])
+            self.plot_2d_result(columns=["Age", "Sex", "Survived"])
             print(f"Accuracy of the model: {self.get_model_accuracy()}%")
         else:
             self.write_json()
-            self.plot_2d_result(columns=["hours", "iq", "result"])
+            self.plot_2d_result(columns=["Age", "Sex", "Survived"])
             print(f"Accuracy of the model: {self.get_model_accuracy()}%")
