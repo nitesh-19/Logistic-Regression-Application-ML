@@ -104,11 +104,14 @@ class LogisticRegression:
             z_coordinates[j] = temp_z
 
         fig1 = plt.figure("figure 1")
-        plt.title("Decision Boundary")
+        plt.title(f"{columns[-1]} Probability Contour Map")
+        plt.xlabel(columns[0])
+        plt.ylabel(columns[1])
         plt.contourf(column_1, column_2, z_coordinates)
-        plt.scatter(self.working_dataframe[columns[0]], self.working_dataframe[columns[1]],
-                    c=self.working_dataframe[columns[2]], marker="x")
-
+        scatter = plt.scatter(self.working_dataframe[columns[0]], self.working_dataframe[columns[1]],
+                              c=self.working_dataframe[columns[2]], marker="x")
+        plt.legend(handles=scatter.legend_elements()[0], labels=[f"{columns[-1]}: 0", f"{columns[-1]}: 1"])
+        plt.colorbar()
         # fig2 = plt.figure("figure 2")
         # plt.title("Cost")
         # plt.plot(X, Y, "o")
@@ -175,7 +178,7 @@ class LogisticRegression:
             ##            #####
             for i in range(1, degree + 1):
                 for j in range(i + 1):
-                    added_features.append((features[0] **  (i - j) * (features[1] ** j)))
+                    added_features.append((features[0] ** (i - j) * (features[1] ** j)))
             ##            #####
             mapped_dataframe.loc[row_index] = added_features
 
@@ -249,10 +252,13 @@ class LogisticRegression:
             self.working_dataframe = pd.DataFrame(data=data[self.feature_names]).copy()
             self.working_dataframe[self.target_name] = data[self.target_name]
             self.working_dataframe.dropna(axis=0, inplace=True)
+            self.working_dataframe.reset_index(inplace=True, drop=True)
 
             # Separate testing data from the dataframe.
             if self.should_make_test_set is True:
                 self.working_dataframe = self.create_test_set(self.working_dataframe, percent_of_data=20)
+
+            self.working_dataframe.reset_index(inplace=True, drop=True)
             self.m = self.working_dataframe.shape[0]
             self.scale_data()
             self.map_dataframe(degree=6)
@@ -349,9 +355,9 @@ class LogisticRegression:
             return np.array(dataframe.iloc[index][[i for i in range(width)]])
 
     def write_json(self):
-        with open("models.json", "r") as inpfile:
+        with open("models.json", "r") as inputfile:
             try:
-                data = json.load(inpfile)
+                data = json.load(inputfile)
                 list_data = [int(key) for key in list(data)]
                 params = {max(list_data) + 1: {"W": list(self.W),
                                                "B": str(self.B),
@@ -375,7 +381,7 @@ class LogisticRegression:
         cost_history = []
         iterations_history = []
         try:
-            while should_continue and self.iterations_finished <= self.iterations_limit:
+            while should_continue and self.iterations_finished < self.iterations_limit:
                 self.gradient_descent()
                 if self.iterations_finished % 50 == 0:
                     print(f"W: {self.W}, B: {self.B}, Cost: {self.cost}")
@@ -385,17 +391,18 @@ class LogisticRegression:
                 if self.iterations_finished % 100 == 0:
                     cost_history.append(self.cost)
                     iterations_history.append(self.iterations_finished)
-
-                if self.cost == prev_iteration_cost:
+                if self.cost == prev_iteration_cost and self.iterations_finished > 2:
                     print(self.W, self.B, self.cost)
                     should_continue = False
                 prev_iteration_cost = self.cost
+            print("Training Finished!")
+            print(f"Total number of iterations finished: {self.iterations_finished}")
 
         except KeyboardInterrupt:
             self.write_json()
-            self.plot_2d_result(columns=["Age", "Sex", "Survived"])
+            print("Training Finished!")
+            print(f"Total number of iterations finished: {self.iterations_finished}")
             print(f"Accuracy of the model: {self.get_model_accuracy()}%")
         else:
             self.write_json()
-            self.plot_2d_result(columns=["Age", "Sex", "Survived"])
             print(f"Accuracy of the model: {self.get_model_accuracy()}%")
