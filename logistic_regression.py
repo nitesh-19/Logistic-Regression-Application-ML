@@ -164,25 +164,32 @@ class LogisticRegression:
         """
         self.degree = degree
         # Temporary dataframe to organize data.
-        mapped_dataframe = pd.DataFrame(columns=self.feature_names)
-
-        # Create empty columns for original and mapped features.
-        mapped_dataframe[
-            [i for i in range(len(self.feature_names),
-                              len(self.feature_names) * degree + math.comb(degree, 2))]] = np.nan
-
-        # Create and add mapped features
-        for row_index in range(self.m):
-            added_features = []
-            features = self.get_features_from_row(row_index)
-            ##            #####
-            for i in range(1, degree + 1):
-                for j in range(i + 1):
-                    added_features.append((features[0] ** (i - j) * (features[1] ** j)))
-            ##            #####
-            mapped_dataframe.loc[row_index] = added_features
-
+        mapped_dataframe = pd.DataFrame()
+        mapped_dataframe[self.feature_names] = self.working_dataframe[self.feature_names]
+        for feature in self.feature_names:
+            for i in range(-degree, degree + 1):
+                if i == 1 or i == 0:
+                    mapped_dataframe[f"{feature}^{i}"] = 0
+                mapped_dataframe[f"{feature}^{i}"] = self.working_dataframe[feature].to_numpy() ** i
+                mapped_dataframe.replace(np.inf, 0, inplace=True)
         mapped_dataframe[self.target_name] = self.working_dataframe[self.target_name]
+        # Create empty columns for original and mapped features.
+        # mapped_dataframe[
+        #     [i for i in range(len(self.feature_names),
+        #                       len(self.feature_names) * degree + math.comb(degree, 2))]] = np.nan
+        #
+        # # Create and add mapped features
+        # for row_index in range(self.m):
+        #     added_features = []
+        #     features = self.get_features_from_row(row_index)
+        #     ##            #####
+        #     for i in range(1, degree + 1):
+        #         for j in range(i + 1):
+        #             added_features.append((features[0] ** (i - j) * (features[1] ** j)))
+        #     ##            #####
+        #     mapped_dataframe.loc[row_index] = added_features
+        #
+        # mapped_dataframe[self.target_name] = self.working_dataframe[self.target_name]
 
         # Replace the original dataframe with mapped dataframe
         self.working_dataframe = mapped_dataframe
@@ -192,11 +199,28 @@ class LogisticRegression:
         self.W = np.zeros(mapped_dataframe.shape[1] - 1)
 
     def map_features(self, features_list):
-        features = []
-        for i in range(1, self.degree + 1):
-            for j in range(i + 1):
-                features.append((features_list[0] ** (i - j) * (features_list[1] ** j)))
-        return np.array(features)
+        features = features_list
+        for feature in features_list:
+            for i in range(-self.degree, self.degree + 1):
+                if i == 1 or i == 0:
+                    features = np.append(features, 0)
+                else:
+                    features = np.append(features, feature ** i)
+
+        # features = features_list
+        # for i in range(-len(features_list), len(features_list) + 1):
+        #     if i == 1 or i == 0 or features_list[i] == 0:
+        #         continue
+        #     features = np.append(features, features_list[i] ** i)
+        # features = np.array(features)
+        return features
+        #     mapped_dataframe[f"{feature}^{i}"] = self.working_dataframe[feature].to_numpy() ** i
+        #     mapped_dataframe[mapped_dataframe[f"{feature}^{i}"] == np.inf] = 0
+        # features = []
+        # for i in range(1, self.degree + 1):
+        #     for j in range(i + 1):
+        #         features.append((features_list[0] ** (i - j) * (features_list[1] ** j)))
+        # return np.array(features)
 
     def scale_data(self, unscale=False):
         """
@@ -304,7 +328,10 @@ class LogisticRegression:
 
         sum_of_dataframe = (y_i * np.log(apply_logistic_regression(self.W, X_array, self.B))) + (
                 (1 - y_i) * np.log(1 - apply_logistic_regression(self.W, X_array, self.B)))
+        np.array(sum_of_dataframe)
+        sum_of_dataframe = np.nan_to_num(sum_of_dataframe,nan=0)
         sum_of_dataframe = np.sum(sum_of_dataframe)
+        sum_of_dataframe = np.nan_to_num(sum_of_dataframe, nan=0)
 
         self.cost = sum_of_dataframe * (-1 / self.m)
         # end = time.time()
@@ -393,7 +420,7 @@ class LogisticRegression:
                     iterations_history.append(self.iterations_finished)
                 if self.cost == prev_iteration_cost and self.iterations_finished > 2:
                     print(self.W, self.B, self.cost)
-                    should_continue = False
+                    # should_continue = False
                 prev_iteration_cost = self.cost
             print("Training Finished!")
             print(f"Total number of iterations finished: {self.iterations_finished}")

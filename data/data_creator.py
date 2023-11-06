@@ -2,9 +2,9 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import random
 
-data = pd.DataFrame(columns=["hours", "iq", "result"], index=range(0, 100))
+data = pd.DataFrame(columns=["hours", "iq", "result"], index=range(0, 500))
 
-for i in range(100):
+for i in range(500):
     hours_studied = round(random.random() * 8, 2)
     iq = round(random.random() * 100)
     if hours_studied <= 3:
